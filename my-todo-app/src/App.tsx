@@ -2,70 +2,45 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import type { Schedule, ScheduleTemplate } from './types/schedule';
 
-// スケジュールアイテムの型定義
-// 時間ベースのタスク管理を実現
-// interface Schedule {
-//   id: number;
-//   title: string;
-//   startTime: string;  // "HH:mm" 形式
-//   endTime: string;    // "HH:mm" 形式
-//   completed: boolean;
-//   progress?: number;  // 0-100、進捗率（完了していない場合）
-//   notes?: string;     // タスク単位のメモ
-//   isRequired: boolean; // true: マスト, false: 努力目標
-// }
-
-// テンプレートの型定義
-// スケジュールのテンプレート保存・読み込み用
-// interface ScheduleTemplate {
-//   id: number;
-//   name: string;
-//   schedules: Omit<Schedule, 'id'>[]; // idを除いたスケジュール配列
-// }
-
-// localStorage操作のヘルパー関数
-// ブラウザを閉じても スケジュールが保持される
+// ============================================================
+// Storage helpers
+// ============================================================
 const STORAGE_KEY_PREFIX = 'schedules-app-data-';
 const TEMPLATES_KEY = 'schedules-templates';
 const ARCHIVE_KEY_PREFIX = 'schedules-app-archive-';
+const DEFAULT_TASKS_KEY = 'schedules-default-tasks';
 
-// 日付をYYYY-MM-DD形式にフォーマット
-const formatDateKey = (date: Date): string => {
-  return date.toISOString().split('T')[0];
-};
+const formatDateKey = (date: Date): string => date.toISOString().split('T')[0];
+const getStorageKey = (date: Date): string => STORAGE_KEY_PREFIX + formatDateKey(date);
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
-// 指定日付のストレージキー取得
-const getStorageKey = (date: Date): string => {
-  return STORAGE_KEY_PREFIX + formatDateKey(date);
-};
-
-const getErrorMessage = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
-};
+const normalizeSchedule = (s: Record<string, unknown>): Schedule => ({
+  id: (s.id as number) || 0,
+  title: (s.title as string) || '',
+  startTime: (s.startTime as string) || '09:00',
+  endTime: (s.endTime as string) || '10:00',
+  completed: (s.completed as boolean) || false,
+  progress: (s.progress as number) || 0,
+  notes: (s.notes as string) || '',
+  isRequired: s.isRequired !== undefined ? (s.isRequired as boolean) : true,
+});
 
 const saveToStorage = (schedules: Schedule[], date: Date) => {
   try {
-    const key = getStorageKey(date);
-    localStorage.setItem(key, JSON.stringify(schedules));
+    localStorage.setItem(getStorageKey(date), JSON.stringify(schedules));
   } catch (error) {
-    console.error('スケジュール保存エラー:', error);
-    alert(`スケジュールの保存に失敗しました。\n\nエラー詳細: ${getErrorMessage(error)}`);
+    console.error('保存エラー:', getErrorMessage(error));
   }
 };
 
-const loadFromStorage = (date: Date): Schedule[] => {
+const loadFromStorage = (date: Date): Schedule[] | null => {
   try {
-    const key = getStorageKey(date);
-    const data = localStorage.getItem(key);
-    if (!data) return [];
-
-    const schedules = JSON.parse(data);
-    // データを正規化して返す
-    return schedules.map(normalizeSchedule);
-  } catch (error) {
-    console.error('スケジュール読み込みエラー:', error);
-    alert(`スケジュールの読み込みに失敗しました。デフォルトの空のスケジュールを使用します。\n\nエラー詳細: ${getErrorMessage(error)}`);
-    return [];
+    const data = localStorage.getItem(getStorageKey(date));
+    if (!data) return null;
+    return (JSON.parse(data) as Record<string, unknown>[]).map(normalizeSchedule);
+  } catch {
+    return null;
   }
 };
 
@@ -75,713 +50,693 @@ const saveTemplatesToStorage = (templates: ScheduleTemplate[]) => {
 
 const loadTemplatesFromStorage = (): ScheduleTemplate[] => {
   const data = localStorage.getItem(TEMPLATES_KEY);
-  return data ? JSON.parse(data) : [];
+  return data ? (JSON.parse(data) as ScheduleTemplate[]) : [];
 };
 
-// アーカイブ保存関数
 const saveArchive = (schedules: Schedule[], date: Date) => {
   try {
-    const key = ARCHIVE_KEY_PREFIX + formatDateKey(date);
-    localStorage.setItem(key, JSON.stringify(schedules));
-    alert('アーカイブを保存しました！');
+    localStorage.setItem(ARCHIVE_KEY_PREFIX + formatDateKey(date), JSON.stringify(schedules));
+    alert('保存しました！');
   } catch (error) {
-    console.error('アーカイブ保存エラー:', error);
-    alert(`アーカイブの保存に失敗しました。\n\nエラー詳細: ${getErrorMessage(error)}`);
+    alert(`保存に失敗しました。\n${getErrorMessage(error)}`);
   }
 };
 
-// アーカイブ読み込み関数
 const loadArchive = (date: Date): Schedule[] => {
   try {
-    const key = ARCHIVE_KEY_PREFIX + formatDateKey(date);
-    const data = localStorage.getItem(key);
-    if (!data) {
-      alert('アーカイブが見つかりません。');
-      return [];
-    }
-    const schedules = JSON.parse(data);
-    alert('アーカイブを読み込みました！');
-    return schedules.map(normalizeSchedule);
+    const data = localStorage.getItem(ARCHIVE_KEY_PREFIX + formatDateKey(date));
+    if (!data) { alert('保存データが見つかりません。'); return []; }
+    alert('読み込みました！');
+    return (JSON.parse(data) as Record<string, unknown>[]).map(normalizeSchedule);
   } catch (error) {
-    console.error('アーカイブ読み込みエラー:', error);
-    alert(`アーカイブの読み込みに失敗しました。\n\nエラー詳細: ${getErrorMessage(error)}`);
+    alert(`読み込みに失敗しました。\n${getErrorMessage(error)}`);
     return [];
   }
 };
 
-// スケジュールデータの正規化関数
-// localStorageから読み込んだデータを正しい形式に変換
-const normalizeSchedule = (schedule: any): Schedule => {
-  return {
-    id: schedule.id || 0,
-    title: schedule.title || '',
-    startTime: schedule.startTime || '08:00',
-    endTime: schedule.endTime || '09:00',
-    completed: schedule.completed || false,
-    progress: schedule.progress || 0,
-    notes: schedule.notes || '',
-    isRequired: schedule.isRequired !== undefined ? schedule.isRequired : true,
-  };
+const getNextHourTime = (hour: string, minute: string) => {
+  const h = Math.min(parseInt(hour, 10) + 1, 23);
+  return { hour: h.toString().padStart(2, '0'), minute };
 };
 
-// 時間を表示用にフォーマットする関数
-const formatTimeDisplay = (time: string): string => {
-  const [hour, minute] = time.split(':');
-  return `${hour}:${minute}`;
+// ============================================================
+// Default task definitions (configurable in Settings)
+// ============================================================
+interface DefaultTaskDef {
+  title: string;
+  startTime: string;
+  endTime: string;
+  isRequired: boolean;
+}
+
+const BUILTIN_DEFAULTS: DefaultTaskDef[] = [
+  { title: '午前タスク1', startTime: '09:00', endTime: '10:00', isRequired: true },
+  { title: '午前タスク2', startTime: '10:00', endTime: '11:00', isRequired: true },
+  { title: '昼', startTime: '12:00', endTime: '13:00', isRequired: false },
+  { title: '午後タスク1', startTime: '13:00', endTime: '14:00', isRequired: true },
+  { title: '午後タスク2', startTime: '14:00', endTime: '15:00', isRequired: false },
+  { title: '会議・進捗', startTime: '16:00', endTime: '17:00', isRequired: true },
+];
+
+const loadDefaultTasks = (): DefaultTaskDef[] => {
+  const data = localStorage.getItem(DEFAULT_TASKS_KEY);
+  return data ? (JSON.parse(data) as DefaultTaskDef[]) : BUILTIN_DEFAULTS;
 };
 
-// 開始時間から+1時間後の時間を取得する関数
-const getNextHourTime = (hour: string, minute: string): { hour: string; minute: string } => {
-  const parsedHour = parseInt(hour, 10);
-  const normalizedMinute = minute.padStart(2, '0');
-  let nextHour = isNaN(parsedHour) ? 9 : parsedHour + 1;
-  if (nextHour > 23) {
-    nextHour = 23;
-  }
-  return {
-    hour: nextHour.toString().padStart(2, '0'),
-    minute: normalizedMinute,
-  };
+const saveDefaultTasksToStorage = (tasks: DefaultTaskDef[]) => {
+  localStorage.setItem(DEFAULT_TASKS_KEY, JSON.stringify(tasks));
 };
 
-// スケジュール管理アプリのメインコンポーネント
-// 時間ベースでタスクを管理し、進捗追跡が可能
-function App() {
-  // 現在の日付管理
-  const [currentDate, setCurrentDate] = useState(new Date());
+const createSchedulesFromDefaults = (defs: DefaultTaskDef[]): Schedule[] =>
+  defs.map((d, i) => ({
+    id: i + 1,
+    title: d.title,
+    startTime: d.startTime,
+    endTime: d.endTime,
+    completed: false,
+    progress: 0,
+    notes: '',
+    isRequired: d.isRequired,
+  }));
 
-  // スケジュールリストの状態管理
-  // 初回ロード時はlocalStorageから読み込み
-  const [schedules, setSchedules] = useState<Schedule[]>(loadFromStorage(currentDate));
+const getInitialSchedules = (date: Date, defTasks: DefaultTaskDef[]): Schedule[] => {
+  const stored = loadFromStorage(date);
+  if (stored !== null) return stored;
+  return createSchedulesFromDefaults(defTasks);
+};
 
-  // テンプレートリストの状態管理
-  const [templates, setTemplates] = useState<ScheduleTemplate[]>(loadTemplatesFromStorage());
+// ============================================================
+// Form type
+// ============================================================
+interface FormData {
+  title: string;
+  startHour: string;
+  startMinute: string;
+  endHour: string;
+  endMinute: string;
+  isRequired: boolean;
+}
 
-  // 編集中のスケジュールID
-  const [editingId, setEditingId] = useState<number | null>(null);
+const EMPTY_FORM: FormData = {
+  title: '',
+  startHour: '09',
+  startMinute: '00',
+  endHour: '10',
+  endMinute: '00',
+  isRequired: true,
+};
 
-  // 編集フォームの状態
-  const [editFormData, setEditFormData] = useState({
-    title: '',
-    startHour: '08',
-    startMinute: '00',
-    endHour: '09',
-    endMinute: '00',
-    isRequired: true,
-  });
+const HOUR_OPTIONS = Array.from({ length: 16 }, (_, i) => (i + 8).toString().padStart(2, '0'));
+const MINUTE_OPTIONS = ['00', '15', '30', '45'];
 
-  // 新規スケジュール追加フォームの状態
-  const [formData, setFormData] = useState({
-    title: '',
-    startHour: '08',
-    startMinute: '00',
-    endHour: '09',
-    endMinute: '00',
-    isRequired: true,
-  });
-
-  // テンプレート保存時の名前入力
-  const [templateName, setTemplateName] = useState('');
-
-  // テンプレート使用時の選択
-  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-
-  // グローバルエラーハンドリング
-  useEffect(() => {
-    const handleGlobalError = (event: ErrorEvent) => {
-      console.error('グローバルエラー:', event.error);
-      alert(`予期しないエラーが発生しました。\n\nエラー詳細: ${event.error?.message || '不明なエラー'}`);
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('未処理のPromise拒否:', event.reason);
-      alert(`非同期処理でエラーが発生しました。\n\nエラー詳細: ${event.reason?.message || event.reason}`);
-    };
-
-    window.addEventListener('error', handleGlobalError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
-
-  // 日付が変更されたらスケジュールを読み込み
-  useEffect(() => {
-    setSchedules(loadFromStorage(currentDate));
-  }, [currentDate]);
-
-  // スケジュールを localStorage に保存
-  useEffect(() => {
-    saveToStorage(schedules, currentDate);
-  }, [schedules, currentDate]);
-
-  // テンプレート保存
-  useEffect(() => {
-    saveTemplatesToStorage(templates);
-  }, [templates]);
-
-  // スケジュール追加ハンドラー
-  const handleAddSchedule = () => {
-    try {
-      // バリデーション：タイトルが空でないか、時間が正しいか確認
-      const startTime = `${formData.startHour}:${formData.startMinute}`;
-      const endTime = `${formData.endHour}:${formData.endMinute}`;
-
-      if (formData.title.trim() === '' || startTime >= endTime) {
-        alert('正しい情報を入力してください');
-        return;
-      }
-
-      // 新しいスケジュールオブジェクト作成
-      const newSchedule: Schedule = {
-        id: schedules.length > 0 ? Math.max(...schedules.map(s => s.id)) + 1 : 1,
-        title: formData.title.trim(),
-        startTime: startTime,
-        endTime: endTime,
-        completed: false,
-        progress: 0,
-        notes: '',
-        isRequired: formData.isRequired,
-      };
-
-      // 状態更新
-      setSchedules(prevSchedules => [...prevSchedules, newSchedule]);
-
-      // フォームをリセット（前回の終了時間を新開始時間に、そこから+1時間を終了時間に）
-      const newStartHour = formData.endHour;
-      const newStartMinute = formData.endMinute;
-
-      // 終了時間の計算（安全にparseIntを使用）
-      let parsedEndHour = parseInt(formData.endHour);
-      if (isNaN(parsedEndHour)) {
-        parsedEndHour = 9; // デフォルト値
-      }
-      let newEndHour = parsedEndHour + 1;
-
-      // 23時を超える場合は23時で止める
-      if (newEndHour > 23) {
-        newEndHour = 23;
-      }
-
-      setFormData({
-        title: '',
-        startHour: newStartHour,
-        startMinute: newStartMinute,
-        endHour: newEndHour.toString().padStart(2, '0'),
-        endMinute: formData.endMinute,
-        isRequired: true,
-      });
-    } catch (error) {
-      console.error('スケジュール追加エラー:', error);
-      alert(`スケジュールの追加に失敗しました。\n\nエラー詳細: ${getErrorMessage(error)}`);
-    }
-  };
-
-  // スケジュール削除ハンドラー
-  const handleDeleteSchedule = (id: number) => {
-    setSchedules(prevSchedules => prevSchedules.filter(s => s.id !== id));
-  };
-
-  // スケジュール編集開始ハンドラー
-  const handleEditSchedule = (id: number) => {
-    const schedule = schedules.find(s => s.id === id);
-    if (!schedule) return;
-
-    const [startHour, startMinute] = schedule.startTime.split(':');
-    const [endHour, endMinute] = schedule.endTime.split(':');
-
-    setEditFormData({
-      title: schedule.title,
-      startHour,
-      startMinute,
-      endHour,
-      endMinute,
-      isRequired: schedule.isRequired,
-    });
-    setEditingId(id);
-  };
-
-  // スケジュール編集保存ハンドラー
-  const handleSaveEdit = () => {
-    if (editingId === null) return;
-
-    const startTime = `${editFormData.startHour}:${editFormData.startMinute}`;
-    const endTime = `${editFormData.endHour}:${editFormData.endMinute}`;
-
-    if (editFormData.title.trim() === '' || startTime >= endTime) {
-      alert('正しい情報を入力してください');
-      return;
-    }
-
-    setSchedules(prevSchedules =>
-      prevSchedules.map(s =>
-        s.id === editingId
-          ? {
-            ...s,
-            title: editFormData.title.trim(),
-            startTime,
-            endTime,
-            isRequired: editFormData.isRequired,
-          }
-          : s
-      )
-    );
-    setEditingId(null);
-  };
-
-  // スケジュール編集キャンセルハンドラー
-  const handleCancelEdit = () => {
-    setEditingId(null);
-  };
-
-  // 完了状態切り替えハンドラー
-  const handleToggleCompleted = (id: number) => {
-    setSchedules(prevSchedules =>
-      prevSchedules.map(s =>
-        s.id === id ? { ...s, completed: !s.completed, progress: 0 } : s
-      )
-    );
-  };
-
-  // 進捗率更新ハンドラー
-  const handleUpdateProgress = (id: number, progress: number) => {
-    setSchedules(prevSchedules =>
-      prevSchedules.map(s =>
-        s.id === id ? { ...s, progress: Math.min(100, Math.max(0, progress)) } : s
-      )
-    );
-  };
-
-  // テンプレート保存ハンドラー
-  const handleSaveTemplate = () => {
-    if (templateName.trim() === '' || schedules.length === 0) {
-      alert('テンプレート名を入力し、スケジュールを追加してください');
-      return;
-    }
-
-    const newTemplate: ScheduleTemplate = {
-      id: templates.length > 0 ? Math.max(...templates.map(t => t.id)) + 1 : 1,
-      name: templateName.trim(),
-      schedules: schedules.map(({ id, ...rest }) => rest), // idを除去
-    };
-
-    setTemplates(prevTemplates => [...prevTemplates, newTemplate]);
-    setTemplateName('');
-    alert('テンプレートを保存しました！');
-  };
-
-  // テンプレート使用ハンドラー
-  const handleUseTemplate = () => {
-    if (selectedTemplate === null) {
-      alert('テンプレートを選択してください');
-      return;
-    }
-
-    const template = templates.find(t => t.id === selectedTemplate);
-    if (!template) return;
-
-    // テンプレートからスケジュールを生成（新しいIDを付与）
-    const newSchedules: Schedule[] = template.schedules.map((schedule, index) => ({
-      ...schedule,
-      id: schedules.length > 0 ? Math.max(...schedules.map(s => s.id)) + index + 1 : index + 1,
-    }));
-
-    setSchedules(prevSchedules => [...prevSchedules, ...newSchedules]);
-    setSelectedTemplate(null);
-    alert('テンプレートを適用しました！');
-  };
-
-  // アーカイブ保存ハンドラー
-  const handleArchiveSave = () => {
-    saveArchive(schedules, currentDate);
-  };
-
-  // アーカイブ読み込みハンドラー
-  const handleArchiveLoad = () => {
-    const archivedSchedules = loadArchive(currentDate);
-    if (archivedSchedules.length > 0) {
-      setSchedules(archivedSchedules);
-    }
-  };
-
-  // 時間でソート（開始時間順）
-  const sortedSchedules = [...schedules].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
+// ============================================================
+// Shared TimeSelect component
+// ============================================================
+function TimeSelect({ hour, minute, onHourChange, onMinuteChange, id }: {
+  hour: string;
+  minute: string;
+  onHourChange: (h: string) => void;
+  onMinuteChange: (m: string) => void;
+  id?: string;
+}) {
   return (
-    <div className="schedule-app">
-      <h1>📅 Daily Schedule</h1>
+    <div className="time-input-group">
+      <select id={id} value={hour} onChange={e => onHourChange(e.target.value)}>
+        {HOUR_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <span className="time-separator">:</span>
+      <select value={minute} onChange={e => onMinuteChange(e.target.value)}>
+        {MINUTE_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+    </div>
+  );
+}
 
-      {/* 日付選択 */}
-      <div className="date-selector">
-        <button onClick={() => setCurrentDate(new Date(currentDate.getTime() - 24 * 60 * 60 * 1000))} className="date-nav-btn">
-          ◀ 前日
-        </button>
-        <input
-          type="date"
-          value={formatDateKey(currentDate)}
-          onChange={(e) => setCurrentDate(new Date(e.target.value))}
-          className="date-input"
+// ============================================================
+// InlineInsertForm — タスク間にインラインで追加するフォーム
+// ============================================================
+function InlineInsertForm({ onConfirm, onCancel }: {
+  onConfirm: (form: FormData) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  return (
+    <div className="inline-insert-form">
+      <input
+        className="inline-title-input"
+        type="text"
+        placeholder="タスク名"
+        value={form.title}
+        onChange={e => setForm({ ...form, title: e.target.value })}
+        autoFocus
+      />
+      <div className="inline-time-row">
+        <span className="inline-time-label">開始</span>
+        <TimeSelect
+          hour={form.startHour}
+          minute={form.startMinute}
+          onHourChange={h => {
+            const next = getNextHourTime(h, form.startMinute);
+            setForm({ ...form, startHour: h, endHour: next.hour, endMinute: next.minute });
+          }}
+          onMinuteChange={m => {
+            const next = getNextHourTime(form.startHour, m);
+            setForm({ ...form, startMinute: m, endHour: next.hour, endMinute: next.minute });
+          }}
         />
-        <button onClick={() => setCurrentDate(new Date(currentDate.getTime() + 24 * 60 * 60 * 1000))} className="date-nav-btn">
-          翌日 ▶
-        </button>
-        <button onClick={() => setCurrentDate(new Date())} className="today-btn">
-          今日
-        </button>
+        <span className="inline-time-label">終了</span>
+        <TimeSelect
+          hour={form.endHour}
+          minute={form.endMinute}
+          onHourChange={h => setForm({ ...form, endHour: h })}
+          onMinuteChange={m => setForm({ ...form, endMinute: m })}
+        />
+        <label className="inline-required-label">
+          <input
+            type="checkbox"
+            checked={form.isRequired}
+            onChange={e => setForm({ ...form, isRequired: e.target.checked })}
+          />
+          マスト
+        </label>
       </div>
-
-      {/* アーカイブ機能 */}
-      <div className="archive-section">
-        <button onClick={handleArchiveSave} className="archive-save-btn">
-          アーカイブ保存
-        </button>
-        <button onClick={handleArchiveLoad} className="archive-load-btn">
-          アーカイブ読み込み
-        </button>
-      </div>
-
-      <div className="app-layout">
-        {/* 左側：入力・テンプレートエリア */}
-        <div className="left-panel">
-          {/* スケジュール追加フォーム */}
-          <div className="schedule-form">
-            <h2>新しいタスクを追加</h2>
-            <div className="form-group">
-              <label htmlFor="title">タスク名</label>
-              <input
-                id="title"
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="例: VSCode + Copilot"
-              />
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="startTime">開始時間</label>
-                <div className="time-input-group">
-                  <select
-                    id="startHour"
-                    value={formData.startHour}
-                    onChange={(e) => {
-                      const next = getNextHourTime(e.target.value, formData.startMinute);
-                      setFormData({
-                        ...formData,
-                        startHour: e.target.value,
-                        endHour: next.hour,
-                        endMinute: next.minute,
-                      });
-                    }}
-                  >
-                    {Array.from({ length: 16 }, (_, i) => {
-                      const hour = i + 8;
-                      return (
-                        <option key={hour} value={hour.toString().padStart(2, '0')}>
-                          {hour.toString().padStart(2, '0')}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <span className="time-separator">:</span>
-                  <select
-                    id="startMinute"
-                    value={formData.startMinute}
-                    onChange={(e) => {
-                      const next = getNextHourTime(formData.startHour, e.target.value);
-                      setFormData({
-                        ...formData,
-                        startMinute: e.target.value,
-                        endHour: next.hour,
-                        endMinute: next.minute,
-                      });
-                    }}
-                  >
-                    <option value="00">00</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                    <option value="45">45</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label htmlFor="endTime">終了時間</label>
-                <div className="time-input-group">
-                  <select
-                    id="endHour"
-                    value={formData.endHour}
-                    onChange={(e) => setFormData({ ...formData, endHour: e.target.value })}
-                  >
-                    {Array.from({ length: 16 }, (_, i) => {
-                      const hour = i + 8;
-                      return (
-                        <option key={hour} value={hour.toString().padStart(2, '0')}>
-                          {hour.toString().padStart(2, '0')}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <span className="time-separator">:</span>
-                  <select
-                    id="endMinute"
-                    value={formData.endMinute}
-                    onChange={(e) => setFormData({ ...formData, endMinute: e.target.value })}
-                  >
-                    <option value="00">00</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                    <option value="45">45</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-group checkbox">
-              <label htmlFor="isRequired">
-                <input
-                  id="isRequired"
-                  type="checkbox"
-                  checked={formData.isRequired}
-                  onChange={(e) => setFormData({ ...formData, isRequired: e.target.checked })}
-                />
-                マストタスク
-              </label>
-            </div>
-
-            <button onClick={handleAddSchedule} className="add-btn">
-              追加
-            </button>
-          </div>
-
-          {/* テンプレート機能 */}
-          <div className="template-section">
-            <h3>テンプレート機能</h3>
-
-            {/* テンプレート保存 */}
-            <div className="template-save">
-              <input
-                type="text"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="テンプレート名"
-              />
-              <button onClick={handleSaveTemplate} className="save-template-btn">
-                テンプレートとして保存
-              </button>
-            </div>
-
-            {/* テンプレート使用 */}
-            <div className="template-use">
-              <select
-                value={selectedTemplate || ''}
-                onChange={(e) => setSelectedTemplate(e.target.value ? parseInt(e.target.value) : null)}
-              >
-                <option value="">テンプレートを選択</option>
-                {templates.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} ({template.schedules.length}タスク)
-                  </option>
-                ))}
-              </select>
-              <button onClick={handleUseTemplate} className="use-template-btn">
-                テンプレートを使用
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 右側：スケジュール表示エリア */}
-        <div className="right-panel">
-          {/* スケジュールリスト */}
-          {sortedSchedules.length === 0 ? (
-            <p className="empty-message">スケジュールがありません</p>
-          ) : (
-            <div className="schedule-list">
-              <h2>{currentDate.toLocaleDateString('ja-JP')}のスケジュール</h2>
-              {sortedSchedules.map(schedule => (
-                <div key={schedule.id} className={`schedule-item ${schedule.completed ? 'completed' : ''} ${schedule.isRequired ? 'must' : 'optional'}`}>
-                  <div className="schedule-time">
-                    <span className="time-badge">{formatTimeDisplay(schedule.startTime)}</span>
-                    <span className="time-separator">-</span>
-                    <span className="time-badge">{formatTimeDisplay(schedule.endTime)}</span>
-                  </div>
-
-                  <div className="schedule-content">
-                    <div className="schedule-header">
-                      <input
-                        type="checkbox"
-                        checked={schedule.completed}
-                        onChange={() => handleToggleCompleted(schedule.id)}
-                        aria-label={`${schedule.title}を完了にする`}
-                      />
-                      {editingId === schedule.id ? (
-                        <input
-                          type="text"
-                          value={editFormData.title}
-                          onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-                          className="edit-title-input"
-                        />
-                      ) : (
-                        <h3 className="schedule-title">{schedule.title}</h3>
-                      )}
-                      {editingId === schedule.id ? (
-                        <label className="edit-required">
-                          <input
-                            type="checkbox"
-                            checked={editFormData.isRequired}
-                            onChange={(e) => setEditFormData({ ...editFormData, isRequired: e.target.checked })}
-                          />
-                          マスト
-                        </label>
-                      ) : (
-                        <span className="badge">{schedule.isRequired ? 'マスト' : '努力'}</span>
-                      )}
-                    </div>
-
-                    {/* 時間編集 */}
-                    {editingId === schedule.id && (
-                      <div className="edit-time-section">
-                        <div className="form-row">
-                          <div className="form-group">
-                            <label>開始時間</label>
-                            <div className="time-input-group">
-                              <select
-                                value={editFormData.startHour}
-                                onChange={(e) => {
-                                  const next = getNextHourTime(e.target.value, editFormData.startMinute);
-                                  setEditFormData({
-                                    ...editFormData,
-                                    startHour: e.target.value,
-                                    endHour: next.hour,
-                                    endMinute: next.minute,
-                                  });
-                                }}
-                              >
-                                {Array.from({ length: 16 }, (_, i) => {
-                                  const hour = i + 8;
-                                  return (
-                                    <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                      {hour.toString().padStart(2, '0')}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                              <span className="time-separator">:</span>
-                              <select
-                                value={editFormData.startMinute}
-                                onChange={(e) => {
-                                  const next = getNextHourTime(editFormData.startHour, e.target.value);
-                                  setEditFormData({
-                                    ...editFormData,
-                                    startMinute: e.target.value,
-                                    endHour: next.hour,
-                                    endMinute: next.minute,
-                                  });
-                                }}
-                              >
-                                <option value="00">00</option>
-                                <option value="15">15</option>
-                                <option value="30">30</option>
-                                <option value="45">45</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div className="form-group">
-                            <label>終了時間</label>
-                            <div className="time-input-group">
-                              <select
-                                value={editFormData.endHour}
-                                onChange={(e) => setEditFormData({ ...editFormData, endHour: e.target.value })}
-                              >
-                                {Array.from({ length: 16 }, (_, i) => {
-                                  const hour = i + 8;
-                                  return (
-                                    <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                      {hour.toString().padStart(2, '0')}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                              <span className="time-separator">:</span>
-                              <select
-                                value={editFormData.endMinute}
-                                onChange={(e) => setEditFormData({ ...editFormData, endMinute: e.target.value })}
-                              >
-                                <option value="00">00</option>
-                                <option value="15">15</option>
-                                <option value="30">30</option>
-                                <option value="45">45</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="edit-buttons">
-                          <button onClick={handleSaveEdit} className="save-edit-btn">保存</button>
-                          <button onClick={handleCancelEdit} className="cancel-edit-btn">キャンセル</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 進捗表示・入力 */}
-                    {!schedule.completed && editingId !== schedule.id && (
-                      <div className="progress-section">
-                        <label htmlFor={`progress-${schedule.id}`}>進捗率</label>
-                        <div className="progress-container">
-                          <input
-                            id={`progress-${schedule.id}`}
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={schedule.progress || 0}
-                            onChange={(e) => handleUpdateProgress(schedule.id, parseInt(e.target.value))}
-                            style={{
-                              background: `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${(schedule.progress || 0)}%, #e0e0e0 ${(schedule.progress || 0)}%, #e0e0e0 100%)`
-                            }}
-                          />
-                          <span className="progress-text">{schedule.progress || 0}%</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* アクションボタン */}
-                    {editingId !== schedule.id && (
-                      <div className="action-buttons">
-                        <button
-                          onClick={() => handleEditSchedule(schedule.id)}
-                          className="edit-btn"
-                          aria-label={`${schedule.title}を編集`}
-                        >
-                          編集
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSchedule(schedule.id)}
-                          className="delete-btn"
-                          aria-label={`${schedule.title}を削除`}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 統計情報 */}
-          <div className="schedule-stats">
-            <p>
-              全タスク: {schedules.length} |
-              完了: {schedules.filter(s => s.completed).length} |
-              マスト: {schedules.filter(s => s.isRequired).length}
-            </p>
-          </div>
-        </div>
+      <div className="inline-insert-buttons">
+        <button className="confirm-insert-btn" onClick={() => onConfirm(form)}>追加</button>
+        <button className="cancel-insert-btn" onClick={onCancel}>キャンセル</button>
       </div>
     </div>
   );
 }
 
-export default App
+type SidePanel = 'template' | 'save' | 'settings' | null;
+
+// ============================================================
+// App — メインコンポーネント
+// ============================================================
+function App() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [defaultTasks, setDefaultTasks] = useState<DefaultTaskDef[]>(loadDefaultTasks);
+  const [schedules, setSchedules] = useState<Schedule[]>(() =>
+    getInitialSchedules(new Date(), loadDefaultTasks())
+  );
+  const [templates, setTemplates] = useState<ScheduleTemplate[]>(loadTemplatesFromStorage);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<FormData>(EMPTY_FORM);
+  const [insertAfterId, setInsertAfterId] = useState<number | null>(null); // -1 = top
+  const [activePanel, setActivePanel] = useState<SidePanel>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [editingDefaults, setEditingDefaults] = useState<DefaultTaskDef[]>(loadDefaultTasks);
+
+  // Date change → reload schedules
+  useEffect(() => {
+    setSchedules(getInitialSchedules(currentDate, loadDefaultTasks()));
+    setEditingId(null);
+    setInsertAfterId(null);
+  }, [currentDate]);
+
+  // Persist schedules
+  useEffect(() => {
+    saveToStorage(schedules, currentDate);
+  }, [schedules, currentDate]);
+
+  // Persist templates
+  useEffect(() => {
+    saveTemplatesToStorage(templates);
+  }, [templates]);
+
+  // Persist defaultTasks
+  useEffect(() => {
+    saveDefaultTasksToStorage(defaultTasks);
+  }, [defaultTasks]);
+
+  const nextId = () =>
+    schedules.length > 0 ? Math.max(...schedules.map(s => s.id)) + 1 : 1;
+
+  const handleConfirmInsert = (form: FormData) => {
+    const startTime = `${form.startHour}:${form.startMinute}`;
+    const endTime = `${form.endHour}:${form.endMinute}`;
+    if (!form.title.trim() || startTime >= endTime) {
+      alert('タイトルと正しい時間を入力してください');
+      return;
+    }
+    setSchedules(prev => [...prev, {
+      id: nextId(),
+      title: form.title.trim(),
+      startTime,
+      endTime,
+      completed: false,
+      progress: 0,
+      notes: '',
+      isRequired: form.isRequired,
+    }]);
+    setInsertAfterId(null);
+  };
+
+  const handleEditSchedule = (id: number) => {
+    const s = schedules.find(s => s.id === id);
+    if (!s) return;
+    const [startHour, startMinute] = s.startTime.split(':');
+    const [endHour, endMinute] = s.endTime.split(':');
+    setEditForm({ title: s.title, startHour, startMinute, endHour, endMinute, isRequired: s.isRequired });
+    setEditingId(id);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingId === null) return;
+    const startTime = `${editForm.startHour}:${editForm.startMinute}`;
+    const endTime = `${editForm.endHour}:${editForm.endMinute}`;
+    if (!editForm.title.trim() || startTime >= endTime) {
+      alert('正しい情報を入力してください');
+      return;
+    }
+    setSchedules(prev => prev.map(s =>
+      s.id === editingId
+        ? { ...s, title: editForm.title.trim(), startTime, endTime, isRequired: editForm.isRequired }
+        : s
+    ));
+    setEditingId(null);
+  };
+
+  const handleDeleteSchedule = (id: number) => {
+    setSchedules(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleToggleCompleted = (id: number) => {
+    setSchedules(prev => prev.map(s =>
+      s.id === id ? { ...s, completed: !s.completed, progress: 0 } : s
+    ));
+  };
+
+  const handleUpdateProgress = (id: number, progress: number) => {
+    setSchedules(prev => prev.map(s =>
+      s.id === id ? { ...s, progress: Math.min(100, Math.max(0, progress)) } : s
+    ));
+  };
+
+  const handleSaveTemplate = () => {
+    if (!templateName.trim() || schedules.length === 0) {
+      alert('テンプレート名を入力し、スケジュールを追加してください');
+      return;
+    }
+    setTemplates(prev => [...prev, {
+      id: prev.length > 0 ? Math.max(...prev.map(t => t.id)) + 1 : 1,
+      name: templateName.trim(),
+      schedules: schedules.map(({ id: _id, ...rest }) => rest),
+    }]);
+    setTemplateName('');
+    alert('テンプレートを保存しました！');
+  };
+
+  const handleApplyTemplate = (template: ScheduleTemplate) => {
+    const base = schedules.length > 0 ? Math.max(...schedules.map(s => s.id)) : 0;
+    setSchedules(prev => [...prev, ...template.schedules.map((s, i) => ({
+      ...s, id: base + i + 1,
+    }))]);
+    alert('テンプレートを適用しました！');
+  };
+
+  const handleDeleteTemplate = (id: number) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  };
+
+  const togglePanel = (panel: SidePanel) => {
+    setActivePanel(prev => prev === panel ? null : panel);
+  };
+
+  const sortedSchedules = [...schedules].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const completedCount = schedules.filter(s => s.completed).length;
+  const mustCount = schedules.filter(s => s.isRequired).length;
+
+  return (
+    <div className="app-shell">
+      {/* ===== 左サイドバー ===== */}
+      <aside className={`sidebar${activePanel ? ' expanded' : ''}`}>
+        <nav className="sidebar-nav">
+          <button
+            className={`nav-item${activePanel === 'template' ? ' active' : ''}`}
+            onClick={() => togglePanel('template')}
+            title="テンプレート"
+          >
+            <span className="nav-icon">📋</span>
+            <span className="nav-label">テンプレート</span>
+          </button>
+          <button
+            className={`nav-item${activePanel === 'save' ? ' active' : ''}`}
+            onClick={() => togglePanel('save')}
+            title="保存"
+          >
+            <span className="nav-icon">💾</span>
+            <span className="nav-label">保存</span>
+          </button>
+          <button
+            className={`nav-item${activePanel === 'settings' ? ' active' : ''}`}
+            onClick={() => togglePanel('settings')}
+            title="設定"
+          >
+            <span className="nav-icon">⚙️</span>
+            <span className="nav-label">設定</span>
+          </button>
+        </nav>
+
+        {activePanel && (
+          <div className="sidebar-panel">
+            {/* テンプレートパネル */}
+            {activePanel === 'template' && (
+              <div className="sub-section">
+                <div className="sub-section-header">
+                  <h3>テンプレート</h3>
+                  <button className="panel-close-btn" onClick={() => setActivePanel(null)}>✕</button>
+                </div>
+                <div className="sub-row">
+                  <input
+                    className="sub-input"
+                    type="text"
+                    value={templateName}
+                    onChange={e => setTemplateName(e.target.value)}
+                    placeholder="テンプレート名"
+                  />
+                  <button onClick={handleSaveTemplate} className="sub-btn">保存</button>
+                </div>
+                {templates.length === 0 && <p className="sub-empty">テンプレートはまだありません</p>}
+                <div className="template-list">
+                  {templates.map(t => (
+                    <div key={t.id} className="template-item">
+                      <div className="template-item-info">
+                        <span className="template-item-name">{t.name}</span>
+                        <span className="template-item-count">{t.schedules.length}タスク</span>
+                      </div>
+                      <div className="template-item-actions">
+                        <button onClick={() => handleApplyTemplate(t)} className="sub-btn-small">適用</button>
+                        <button onClick={() => handleDeleteTemplate(t.id)} className="sub-btn-small danger">削除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 保存パネル */}
+            {activePanel === 'save' && (
+              <div className="sub-section">
+                <div className="sub-section-header">
+                  <h3>保存</h3>
+                  <button className="panel-close-btn" onClick={() => setActivePanel(null)}>✕</button>
+                </div>
+                <p className="sub-date">{currentDate.toLocaleDateString('ja-JP')}</p>
+                <div className="sub-row vertical">
+                  <button
+                    onClick={() => saveArchive(schedules, currentDate)}
+                    className="sub-btn full"
+                  >
+                    💾 現在の状態を保存
+                  </button>
+                  <button
+                    onClick={() => {
+                      const loaded = loadArchive(currentDate);
+                      if (loaded.length > 0) setSchedules(loaded);
+                    }}
+                    className="sub-btn full outline"
+                  >
+                    📂 保存データを読み込む
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 設定パネル */}
+            {activePanel === 'settings' && (
+              <div className="sub-section">
+                <div className="sub-section-header">
+                  <h3>設定</h3>
+                  <button className="panel-close-btn" onClick={() => setActivePanel(null)}>✕</button>
+                </div>
+                <h4 className="sub-heading">初期タスク設定</h4>
+                <p className="sub-hint">新しい日に自動で作成されるタスクを設定します</p>
+                <div className="default-task-list">
+                  {editingDefaults.map((d, i) => (
+                    <div key={i} className="default-task-item">
+                      <input
+                        className="sub-input default-task-title"
+                        value={d.title}
+                        onChange={e => {
+                          const updated = [...editingDefaults];
+                          updated[i] = { ...d, title: e.target.value };
+                          setEditingDefaults(updated);
+                        }}
+                        placeholder="タスク名"
+                      />
+                      <div className="default-task-times">
+                        <input
+                          className="sub-input time-mini"
+                          type="time"
+                          value={d.startTime}
+                          onChange={e => {
+                            const updated = [...editingDefaults];
+                            updated[i] = { ...d, startTime: e.target.value };
+                            setEditingDefaults(updated);
+                          }}
+                        />
+                        <span>〜</span>
+                        <input
+                          className="sub-input time-mini"
+                          type="time"
+                          value={d.endTime}
+                          onChange={e => {
+                            const updated = [...editingDefaults];
+                            updated[i] = { ...d, endTime: e.target.value };
+                            setEditingDefaults(updated);
+                          }}
+                        />
+                      </div>
+                      <div className="default-task-footer">
+                        <label className="default-task-required">
+                          <input
+                            type="checkbox"
+                            checked={d.isRequired}
+                            onChange={e => {
+                              const updated = [...editingDefaults];
+                              updated[i] = { ...d, isRequired: e.target.checked };
+                              setEditingDefaults(updated);
+                            }}
+                          />
+                          マスト
+                        </label>
+                        <button
+                          className="sub-btn-small danger"
+                          onClick={() => setEditingDefaults(prev => prev.filter((_, j) => j !== i))}
+                        >✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className="sub-btn full"
+                  style={{ marginTop: '8px' }}
+                  onClick={() => setEditingDefaults(prev => [
+                    ...prev,
+                    { title: 'タスク', startTime: '09:00', endTime: '10:00', isRequired: true }
+                  ])}
+                >＋ タスクを追加</button>
+                <div className="sub-row" style={{ marginTop: '12px' }}>
+                  <button
+                    className="sub-btn"
+                    onClick={() => {
+                      setDefaultTasks(editingDefaults);
+                      alert('初期タスク設定を保存しました');
+                    }}
+                  >保存</button>
+                  <button
+                    className="sub-btn outline"
+                    onClick={() => setEditingDefaults(BUILTIN_DEFAULTS)}
+                  >リセット</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </aside>
+
+      {/* ===== メインコンテンツ ===== */}
+      <main className="main-content">
+        <header className="app-header">
+          <div className="date-nav">
+            <button
+              className="date-nav-btn"
+              onClick={() => setCurrentDate(d => new Date(d.getTime() - 86400000))}
+            >◀</button>
+            <input
+              type="date"
+              className="date-input"
+              value={formatDateKey(currentDate)}
+              onChange={e => setCurrentDate(new Date(e.target.value + 'T00:00:00'))}
+            />
+            <button
+              className="date-nav-btn"
+              onClick={() => setCurrentDate(d => new Date(d.getTime() + 86400000))}
+            >▶</button>
+            <button className="today-btn" onClick={() => setCurrentDate(new Date())}>今日</button>
+          </div>
+          <div className="stats-bar">
+            <span className="stat">{schedules.length} タスク</span>
+            <span className="stat-sep">|</span>
+            <span className="stat stat-done">{completedCount} 完了</span>
+            <span className="stat-sep">|</span>
+            <span className="stat">{mustCount} マスト</span>
+          </div>
+        </header>
+
+        <div className="schedule-list">
+          {/* 先頭の ＋ ボタン / インライン追加フォーム */}
+          {insertAfterId === -1 ? (
+            <InlineInsertForm
+              onConfirm={handleConfirmInsert}
+              onCancel={() => setInsertAfterId(null)}
+            />
+          ) : (
+            <button
+              className="insert-between"
+              onClick={() => setInsertAfterId(-1)}
+              title="先頭に追加"
+            >＋</button>
+          )}
+
+          {sortedSchedules.length === 0 && insertAfterId !== -1 && (
+            <p className="empty-message">タスクがありません</p>
+          )}
+
+          {sortedSchedules.map(schedule => (
+            <div key={schedule.id}>
+              <div className={`schedule-item${schedule.completed ? ' completed' : ''}${schedule.isRequired ? ' must' : ' optional'}`}>
+                <div className="schedule-time">
+                  <span className="time-badge">{schedule.startTime}</span>
+                  <span className="time-sep-dash">-</span>
+                  <span className="time-badge">{schedule.endTime}</span>
+                </div>
+
+                <div className="schedule-content">
+                  <div className="schedule-header">
+                    <input
+                      type="checkbox"
+                      checked={schedule.completed}
+                      onChange={() => handleToggleCompleted(schedule.id)}
+                      aria-label={`${schedule.title}を完了にする`}
+                    />
+                    {editingId === schedule.id ? (
+                      <input
+                        type="text"
+                        value={editForm.title}
+                        onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                        className="edit-title-input"
+                      />
+                    ) : (
+                      <h3 className="schedule-title">{schedule.title}</h3>
+                    )}
+                    {editingId === schedule.id ? (
+                      <label className="edit-required">
+                        <input
+                          type="checkbox"
+                          checked={editForm.isRequired}
+                          onChange={e => setEditForm({ ...editForm, isRequired: e.target.checked })}
+                        />
+                        マスト
+                      </label>
+                    ) : (
+                      <span className="badge">{schedule.isRequired ? 'マスト' : '努力'}</span>
+                    )}
+                  </div>
+
+                  {/* 時間編集 */}
+                  {editingId === schedule.id && (
+                    <div className="edit-time-section">
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>開始</label>
+                          <TimeSelect
+                            hour={editForm.startHour}
+                            minute={editForm.startMinute}
+                            onHourChange={h => {
+                              const next = getNextHourTime(h, editForm.startMinute);
+                              setEditForm({ ...editForm, startHour: h, endHour: next.hour, endMinute: next.minute });
+                            }}
+                            onMinuteChange={m => {
+                              const next = getNextHourTime(editForm.startHour, m);
+                              setEditForm({ ...editForm, startMinute: m, endHour: next.hour, endMinute: next.minute });
+                            }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>終了</label>
+                          <TimeSelect
+                            hour={editForm.endHour}
+                            minute={editForm.endMinute}
+                            onHourChange={h => setEditForm({ ...editForm, endHour: h })}
+                            onMinuteChange={m => setEditForm({ ...editForm, endMinute: m })}
+                          />
+                        </div>
+                      </div>
+                      <div className="edit-buttons">
+                        <button onClick={handleSaveEdit} className="save-edit-btn">保存</button>
+                        <button onClick={() => setEditingId(null)} className="cancel-edit-btn">キャンセル</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 進捗スライダー */}
+                  {!schedule.completed && editingId !== schedule.id && (
+                    <div className="progress-section">
+                      <label htmlFor={`progress-${schedule.id}`}>進捗率</label>
+                      <div className="progress-container">
+                        <input
+                          id={`progress-${schedule.id}`}
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={schedule.progress || 0}
+                          onChange={e => handleUpdateProgress(schedule.id, parseInt(e.target.value))}
+                          style={{
+                            background: `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${schedule.progress || 0}%, #e0e0e0 ${schedule.progress || 0}%, #e0e0e0 100%)`
+                          }}
+                        />
+                        <span className="progress-text">{schedule.progress || 0}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* アクションボタン */}
+                  {editingId !== schedule.id && (
+                    <div className="action-buttons">
+                      <button
+                        onClick={() => handleEditSchedule(schedule.id)}
+                        className="edit-btn"
+                      >編集</button>
+                      <button
+                        onClick={() => handleDeleteSchedule(schedule.id)}
+                        className="delete-btn"
+                      >削除</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* タスク間の ＋ ボタン / インライン追加フォーム */}
+              {insertAfterId === schedule.id ? (
+                <InlineInsertForm
+                  onConfirm={handleConfirmInsert}
+                  onCancel={() => setInsertAfterId(null)}
+                />
+              ) : (
+                <button
+                  className="insert-between"
+                  onClick={() => setInsertAfterId(schedule.id)}
+                  title="ここに追加"
+                >＋</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default App;

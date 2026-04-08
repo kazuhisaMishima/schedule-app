@@ -7,5 +7,5 @@ export default defineConfig({
   server: {
     host: true,
   },
-  root: './my-todo-app',
+  // root: './my-todo-app',
 })
