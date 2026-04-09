@@ -16,6 +16,7 @@ export interface Schedule {
   progress?: number;  // 0-100 : 進捗率（未完了の場合のみ有効）
   notes?: string;     // タスク単位のメモ
   isRequired: boolean; // true: マスト / false: 努力目標
+  order?: number;     // 手動並び替え順（未設定時は startTime でフォールバック）
 }
 
 /**
