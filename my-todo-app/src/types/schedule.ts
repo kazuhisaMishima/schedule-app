@@ -44,9 +44,28 @@ export interface ScheduleFormData {
 /** ScheduleFormData の初期値 */
 export const INITIAL_FORM_DATA: ScheduleFormData = {
   title: '',
-  startHour: '08',
+  startHour: '09',
   startMinute: '00',
-  endHour: '09',
+  endHour: '10',
   endMinute: '00',
   isRequired: true,
 };
+
+/**
+ * デフォルトタスク定義（設定パネルで編集可能）
+ */
+export interface DefaultTaskDef {
+  title: string;
+  startTime: string;
+  endTime: string;
+  isRequired: boolean;
+}
+
+export const BUILTIN_DEFAULTS: DefaultTaskDef[] = [
+  { title: '午前タスク1', startTime: '09:00', endTime: '10:00', isRequired: true },
+  { title: '午前タスク2', startTime: '10:00', endTime: '11:00', isRequired: true },
+  { title: '昼', startTime: '12:00', endTime: '13:00', isRequired: false },
+  { title: '午後タスク1', startTime: '13:00', endTime: '14:00', isRequired: true },
+  { title: '午後タスク2', startTime: '14:00', endTime: '15:00', isRequired: false },
+  { title: '会議・進捗', startTime: '16:00', endTime: '17:00', isRequired: true },
+];

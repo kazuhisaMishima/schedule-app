@@ -387,18 +387,30 @@ body {
   background: #2563eb;
 }
 
+/* 日付入力 + 曜日をまとめたラッパー */
+.date-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding-right: 10px;
+  transition: border-color 0.15s;
+}
+
+.date-field-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
 .date-input {
   padding: 7px 12px;
-  border: 1px solid #cbd5e1;
+  border: none;
   border-radius: 8px;
   font-size: 15px;
   outline: none;
-  transition: border-color 0.15s;
-  background: #f8fafc;
-}
-
-.date-input:focus {
-  border-color: #3b82f6;
+  background: transparent;
 }
 
 .today-btn {
@@ -856,4 +868,56 @@ body {
   color: #94a3b8;
   font-size: 15px;
   padding: 40px 0;
+}
+
+/* 曜日ラベル */
+.weekday-label {
+  font-size: 15px;
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+/* メモトグルボタン */
+.notes-toggle-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 10px;
+  transition: background 0.15s;
+}
+
+.notes-toggle-btn:hover {
+  background: #e2e8f0;
+}
+
+.notes-toggle-btn.active {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* メモテキストエリア */
+.notes-textarea {
+  width: 100%;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #334155;
+  background: #f8fafc;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.notes-textarea:focus {
+  outline: none;
+  border-color: #94a3b8;
+  background: #fff;
 }
