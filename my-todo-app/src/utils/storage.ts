@@ -21,6 +21,7 @@ const normalizeSchedule = (s: Record<string, unknown>): Schedule => ({
   progress: (s.progress as number) || 0,
   notes: (s.notes as string) || '',
   isRequired: s.isRequired !== undefined ? (s.isRequired as boolean) : true,
+  order: typeof s.order === 'number' ? s.order : undefined,
 });
 
 export const saveToStorage = (schedules: Schedule[], date: Date) => {

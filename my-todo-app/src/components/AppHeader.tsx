@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { formatDateKey } from '../utils/storage';
 
 interface AppHeaderProps {
@@ -9,6 +10,8 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ currentDate, changeDate, totalCount, completedCount, mustCount }: AppHeaderProps) {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <header className="app-header">
       <div className="date-nav">
@@ -18,6 +21,7 @@ export function AppHeader({ currentDate, changeDate, totalCount, completedCount,
         >◀</button>
         <div className="date-field-wrapper">
           <input
+            ref={dateInputRef}
             type="date"
             className="date-input"
             value={formatDateKey(currentDate)}
@@ -29,6 +33,13 @@ export function AppHeader({ currentDate, changeDate, totalCount, completedCount,
           <span className="weekday-label">
             ({currentDate.toLocaleDateString('ja-JP', { weekday: 'short' })})
           </span>
+          <button
+            className="calendar-picker-btn"
+            onClick={() => dateInputRef.current?.showPicker()}
+            aria-label="カレンダーを開く"
+          >
+            📅
+          </button>
         </div>
         <button
           className="date-nav-btn"

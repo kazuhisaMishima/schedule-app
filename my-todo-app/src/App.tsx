@@ -34,6 +34,7 @@ function App() {
     handleToggleCompleted,
     handleUpdateProgress,
     handleUpdateNotes,
+    handleReorder,
     handleSaveArchive,
     handleLoadArchive,
   } = useSchedules();
@@ -147,6 +148,7 @@ function App() {
           onCancelEdit={() => setEditingId(null)}
           onDeleteSchedule={handleDeleteSchedule}
           onUpdateNotes={handleUpdateNotes}
+          onReorder={handleReorder}
         />
       </main>
     </div>
