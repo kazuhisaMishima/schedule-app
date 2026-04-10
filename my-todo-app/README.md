@@ -1,73 +1,144 @@
-# React + TypeScript + Vite
+# スケジュール管理アプリ
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+日本語対応のシンプルなタスク管理アプリです。ブラウザで動作し、バックエンドなしで全データをローカル保存できます。
 
-Currently, two official plugins are available:
+## 主な特徴
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- ✅ 日時を指定したタスク管理
+- ✅ 進捗率追跡（0-100%）
+- ✅ マスト/努力目標の区別
+- ✅ テンプレート機能（よく使うタスクセットの保存）
+- ✅ JSON ファイルでのバックアップ・復元
+- ✅ デフォルトタスク設定（新規日付で自動作成）
 
-## React Compiler
+## 必要な環境
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 18 以上
+- npm
 
-## Expanding the ESLint configuration
+## インストール・セットアップ
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. リポジトリをクローン
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone <repository-url>
+cd my-todo-app
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 依存パッケージをインストール
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+### 3. 開発サーバーを起動
+
+```bash
+npm run dev
+```
+
+ブラウザで自動的に `http://localhost:5173` が開きます。
+
+## 開発コマンド
+
+```bash
+npm run dev       # 開発サーバー起動（ホットリロード対応）
+npm run build     # 型チェック + プロダクションビルド
+npm run lint      # ESLint でコード品質チェック
+npm run preview   # ビルド後のプレビュー表示
+```
+
+## ファイル構造
+
+```
+src/
+├── App.tsx                    # メインアプリケーション
+├── App.css                    # アプリケーションスタイル
+├── index.css                  # グローバルスタイル
+├── main.tsx                   # エントリーポイント
+├── ErrorBoundary.tsx          # エラーハンドリング
+├── components/                # UI部品
+│   ├── Sidebar.tsx           # サイドメニュー
+│   ├── AppHeader.tsx         # ヘッダー
+│   ├── ScheduleList.tsx      # タスク一覧
+│   └── ...その他UI部品
+├── hooks/                     # 状態管理ロジック
+│   ├── useSchedules.ts       # スケジュール状態管理
+│   ├── useTemplates.ts       # テンプレート管理
+│   └── useDefaultTasks.ts    # デフォルトタスク管理
+├── utils/                     # ユーティリティ
+│   └── storage.ts            # LocalStorage/JSON ファイル処理
+└── types/                     # TypeScript 型定義
+    └── schedule.ts           # Schedule / ScheduleTemplate 型
+```
+
+### 各フォルダの役割
+
+- **components/** — ボタン、フォーム、パネルなど画面に表示される UI 部品
+- **hooks/** — データの保存・読み込み・更新を処理する仕組み
+- **utils/** — データを JSON ファイルに変換するなど、共通機能
+
+## 使い方
+
+### タスク管理
+
+1. **タスク追加** — 「＋」ボタンまたは「タスク間に追加」でタスク作成
+2. **編集** — タスクをクリックして編集
+3. **進捗更新** — スライダーで進捗率を設定
+4. **完了** — チェックボックスで完了・未完了を切り替え
+
+### テンプレート
+
+1. **保存** — サイドバー「テンプレート」→ 現在のタスクセットを名前付きで保存
+2. **適用** — 保存済みテンプレートを選んで「適用」ボタンで一括読み込み
+
+### バックアップ
+
+1. **ダウンロード** — サイドバー「保存」→ 「データをダウンロード」で JSON ファイル取得
+2. **インポート** — 「ファイルからインポート」で以前のバックアップを復元
+
+## トラブルシューティング
+
+### npm install でエラーが出た
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### 開発サーバーが起動しない
+
+```bash
+# ターミナルを閉じて再度実行
+npm run dev
+```
+
+### アプリが表示されない
+
+- ブラウザのキャッシュをクリアする
+- DevTools を開いて Console タブでエラーを確認
+
+### データが消えた
+
+ブラウザキャッシュをクリアしてしまった場合、以前ダウンロードした JSON ファイルがあれば復元できます：
+
+1. サイドバー「保存」を開く
+2. 「ファイルからインポート」ボタンで JSON ファイルを選択
+3. ページが自動リロードしてデータが復元されます
+
+## 技術スタック
+
+| 項目 | 技術 | バージョン |
+|------|------|----------|
+| フレームワーク | React | 19.2.4 |
+| ビルドツール | Vite | 8.0.4 |
+| 言語 | TypeScript | 6.0.2 |
+| リンター | ESLint | 9.39.4 |
+| ターゲット | ES2023 | - |
+
+## 開発時の注意点
+
+- **型安全** — TypeScript strict モードを使用
+- **コード品質** — ESLint による自動チェック
+- **ライブラリ最小化** — React のみを使用（外部ライブラリなし）
+- **データストア** — LocalStorage が唯一のデータベース（バックエンド不要）
