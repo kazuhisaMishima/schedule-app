@@ -1,5 +1,20 @@
 import type { Dispatch, SetStateAction, RefObject } from 'react';
-import type { ScheduleTemplate, DefaultTaskDef } from '../types/schedule';
+import type { ScheduleTemplate, DefaultTaskDef, RecurrenceRule } from '../types/schedule';
+
+// 月〜金のみ（土日なし）
+const WEEKDAYS_JA: { label: string; dow: number }[] = [
+  { label: '月', dow: 1 },
+  { label: '火', dow: 2 },
+  { label: '水', dow: 3 },
+  { label: '木', dow: 4 },
+  { label: '金', dow: 5 },
+];
+
+const getRecurrenceType = (r: RecurrenceRule | undefined): string =>
+  !r || r.type === 'daily' ? 'daily' : 'weekly';
+
+const getWeeklyDays = (r: RecurrenceRule | undefined): number[] =>
+  r?.type === 'weekly' ? r.days : [];
 
 export type SidePanel = 'template' | 'save' | 'settings' | null;
 
@@ -164,8 +179,16 @@ export function Sidebar({
               <h4 className="sub-heading">初期タスク設定</h4>
               <p className="sub-hint">新しい日に自動で作成されるタスクを設定します</p>
               <div className="default-task-list">
+                <button
+                  className="insert-between"
+                  onClick={() => setEditingDefaults(prev => [
+                    { title: 'タスク', startTime: '09:00', endTime: '10:00', isRequired: true },
+                    ...prev,
+                  ])}
+                >＋</button>
                 {editingDefaults.map((d, i) => (
-                  <div key={i} className="default-task-item">
+                  <div key={i}>
+                  <div className="default-task-item">
                     <input
                       className="sub-input default-task-title"
                       value={d.title}
@@ -217,17 +240,65 @@ export function Sidebar({
                         onClick={() => setEditingDefaults(prev => prev.filter((_, j) => j !== i))}
                       >✕</button>
                     </div>
+                    <div className="recurrence-row">
+                      <label className="recurrence-label">繰り返し</label>
+                      <select
+                        className="recurrence-select"
+                        value={getRecurrenceType(d.recurrence)}
+                        onChange={e => {
+                          const updated = [...editingDefaults];
+                          const val = e.target.value;
+                          updated[i] = {
+                            ...d,
+                            recurrence: val === 'daily' ? undefined
+                              : { type: 'weekly', days: getWeeklyDays(d.recurrence) },
+                          };
+                          setEditingDefaults(updated);
+                        }}
+                      >
+                        <option value="daily">毎日</option>
+                        <option value="weekly">曜日指定</option>
+                      </select>
+                    </div>
+                    {getRecurrenceType(d.recurrence) === 'weekly' && (
+                      <div className="day-checkboxes">
+                        {WEEKDAYS_JA.map(({ label, dow }) => (
+                          <label key={dow} className="day-checkbox-label">
+                            <input
+                              type="checkbox"
+                              checked={getWeeklyDays(d.recurrence).includes(dow)}
+                              onChange={e => {
+                                const updated = [...editingDefaults];
+                                const days = getWeeklyDays(d.recurrence);
+                                updated[i] = {
+                                  ...d,
+                                  recurrence: {
+                                    type: 'weekly',
+                                    days: e.target.checked
+                                      ? [...days, dow].sort()
+                                      : days.filter(x => x !== dow),
+                                  },
+                                };
+                                setEditingDefaults(updated);
+                              }}
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="insert-between"
+                    onClick={() => setEditingDefaults(prev => {
+                      const next = [...prev];
+                      next.splice(i + 1, 0, { title: 'タスク', startTime: '09:00', endTime: '10:00', isRequired: true });
+                      return next;
+                    })}
+                  >＋</button>
                   </div>
                 ))}
               </div>
-              <button
-                className="sub-btn full"
-                style={{ marginTop: '8px' }}
-                onClick={() => setEditingDefaults(prev => [
-                  ...prev,
-                  { title: 'タスク', startTime: '09:00', endTime: '10:00', isRequired: true }
-                ])}
-              >＋ タスクを追加</button>
               <div className="sub-row" style={{ marginTop: '12px' }}>
                 <button className="sub-btn" onClick={onSaveDefaults}>保存</button>
                 <button className="sub-btn outline" onClick={onResetDefaults}>リセット</button>

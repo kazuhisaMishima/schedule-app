@@ -2,25 +2,27 @@ import { useState, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Schedule, ScheduleFormData } from '../types/schedule';
 import { INITIAL_FORM_DATA } from '../types/schedule';
-import { loadFromStorage, saveToStorage, loadDefaultTasks, saveArchive, loadArchive } from '../utils/storage';
+import { loadFromStorage, saveToStorage, loadDefaultTasks, saveArchive, loadArchive, matchesRecurrence } from '../utils/storage';
 
-const createSchedulesFromDefaults = (defs: ReturnType<typeof loadDefaultTasks>): Schedule[] =>
-  defs.map((d, i) => ({
-    id: i + 1,
-    title: d.title,
-    startTime: d.startTime,
-    endTime: d.endTime,
-    completed: false,
-    progress: 0,
-    notes: '',
-    isRequired: d.isRequired,
-    order: i,
-  }));
+const createSchedulesFromDefaults = (defs: ReturnType<typeof loadDefaultTasks>, date: Date): Schedule[] =>
+  defs
+    .filter(d => matchesRecurrence(d.recurrence, date))
+    .map((d, i) => ({
+      id: i + 1,
+      title: d.title,
+      startTime: d.startTime,
+      endTime: d.endTime,
+      completed: false,
+      progress: 0,
+      notes: '',
+      isRequired: d.isRequired,
+      order: i,
+    }));
 
 const getInitialSchedules = (date: Date): Schedule[] => {
   const stored = loadFromStorage(date);
   if (stored !== null) return stored;
-  return createSchedulesFromDefaults(loadDefaultTasks());
+  return createSchedulesFromDefaults(loadDefaultTasks(), date);
 };
 
 export interface UseSchedulesReturn {
