@@ -10,6 +10,7 @@ const getNextHourTime = (hour: string, minute: string) => {
 
 interface ScheduleItemProps {
   schedule: Schedule;
+  currentTime: string;
   editingId: number | null;
   editForm: ScheduleFormData;
   setEditForm: Dispatch<SetStateAction<ScheduleFormData>>;
@@ -24,6 +25,7 @@ interface ScheduleItemProps {
 
 export function ScheduleItem({
   schedule,
+  currentTime,
   editingId,
   editForm,
   setEditForm,
@@ -37,9 +39,13 @@ export function ScheduleItem({
 }: ScheduleItemProps) {
   const isEditing = editingId === schedule.id;
   const [showNotes, setShowNotes] = useState(false);
+  const isCurrentTask = !schedule.completed
+    && schedule.startTime <= currentTime
+    && currentTime < schedule.endTime;
 
   return (
-    <div className={`schedule-item${schedule.completed ? ' completed' : ''}${schedule.isRequired ? ' must' : ' optional'}`}>
+    <div className={`schedule-item${schedule.completed ? ' completed' : ''}${schedule.isRequired ? ' must' : ' optional'}${isCurrentTask ? ' current-task' : ''}`}>
+      <div className="drag-handle" title="ドラッグして並び替え">⠿</div>
       <div className="schedule-time">
         <span className="time-badge">{schedule.startTime}</span>
         <span className="time-sep-dash">-</span>

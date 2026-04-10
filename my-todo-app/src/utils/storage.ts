@@ -1,5 +1,10 @@
-import type { Schedule, ScheduleTemplate, DefaultTaskDef } from '../types/schedule';
+import type { Schedule, ScheduleTemplate, DefaultTaskDef, RecurrenceRule } from '../types/schedule';
 import { BUILTIN_DEFAULTS } from '../types/schedule';
+
+export const matchesRecurrence = (rule: RecurrenceRule | undefined, date: Date): boolean => {
+  if (!rule || rule.type === 'daily') return true;
+  return rule.days.includes(date.getDay());
+};
 
 const STORAGE_KEY_PREFIX = 'schedules-app-data-';
 const TEMPLATES_KEY = 'schedules-templates';
@@ -21,6 +26,7 @@ const normalizeSchedule = (s: Record<string, unknown>): Schedule => ({
   progress: (s.progress as number) || 0,
   notes: (s.notes as string) || '',
   isRequired: s.isRequired !== undefined ? (s.isRequired as boolean) : true,
+  order: typeof s.order === 'number' ? s.order : undefined,
 });
 
 export const saveToStorage = (schedules: Schedule[], date: Date) => {

@@ -2,24 +2,27 @@ import { useState, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Schedule, ScheduleFormData } from '../types/schedule';
 import { INITIAL_FORM_DATA } from '../types/schedule';
-import { loadFromStorage, saveToStorage, loadDefaultTasks, saveArchive, loadArchive } from '../utils/storage';
+import { loadFromStorage, saveToStorage, loadDefaultTasks, saveArchive, loadArchive, matchesRecurrence } from '../utils/storage';
 
-const createSchedulesFromDefaults = (defs: ReturnType<typeof loadDefaultTasks>): Schedule[] =>
-  defs.map((d, i) => ({
-    id: i + 1,
-    title: d.title,
-    startTime: d.startTime,
-    endTime: d.endTime,
-    completed: false,
-    progress: 0,
-    notes: '',
-    isRequired: d.isRequired,
-  }));
+const createSchedulesFromDefaults = (defs: ReturnType<typeof loadDefaultTasks>, date: Date): Schedule[] =>
+  defs
+    .filter(d => matchesRecurrence(d.recurrence, date))
+    .map((d, i) => ({
+      id: i + 1,
+      title: d.title,
+      startTime: d.startTime,
+      endTime: d.endTime,
+      completed: false,
+      progress: 0,
+      notes: '',
+      isRequired: d.isRequired,
+      order: i,
+    }));
 
 const getInitialSchedules = (date: Date): Schedule[] => {
   const stored = loadFromStorage(date);
   if (stored !== null) return stored;
-  return createSchedulesFromDefaults(loadDefaultTasks());
+  return createSchedulesFromDefaults(loadDefaultTasks(), date);
 };
 
 export interface UseSchedulesReturn {
@@ -43,6 +46,7 @@ export interface UseSchedulesReturn {
   handleToggleCompleted: (id: number) => void;
   handleUpdateProgress: (id: number, progress: number) => void;
   handleUpdateNotes: (id: number, notes: string) => void;
+  handleReorder: (fromId: number, toId: number) => void;
   handleSaveArchive: () => void;
   handleLoadArchive: () => void;
 }
@@ -76,6 +80,7 @@ export function useSchedules(): UseSchedulesReturn {
       alert('タイトルと正しい時間を入力してください');
       return;
     }
+    const maxOrder = schedules.reduce((max, s) => Math.max(max, s.order ?? -1), -1);
     setSchedules(prev => [...prev, {
       id: nextId(),
       title: form.title.trim(),
@@ -85,6 +90,7 @@ export function useSchedules(): UseSchedulesReturn {
       progress: 0,
       notes: '',
       isRequired: form.isRequired,
+      order: maxOrder + 1,
     }]);
     setInsertAfterId(null);
   };
@@ -136,6 +142,22 @@ export function useSchedules(): UseSchedulesReturn {
     ));
   };
 
+  const handleReorder = (fromId: number, toId: number) => {
+    setSchedules(prev => {
+      const sorted = [...prev].sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        return a.startTime.localeCompare(b.startTime);
+      });
+      const fromIdx = sorted.findIndex(s => s.id === fromId);
+      const toIdx = sorted.findIndex(s => s.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const reordered = [...sorted];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      return reordered.map((s, i) => ({ ...s, order: i }));
+    });
+  };
+
   const handleSaveArchive = () => {
     saveArchive(schedules, currentDate);
   };
@@ -145,7 +167,10 @@ export function useSchedules(): UseSchedulesReturn {
     if (loaded.length > 0) setSchedules(loaded);
   };
 
-  const sortedSchedules = [...schedules].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const sortedSchedules = [...schedules].sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+    return a.startTime.localeCompare(b.startTime);
+  });
   const completedCount = schedules.filter(s => s.completed).length;
   const mustCount = schedules.filter(s => s.isRequired).length;
 
@@ -170,6 +195,7 @@ export function useSchedules(): UseSchedulesReturn {
     handleToggleCompleted,
     handleUpdateProgress,
     handleUpdateNotes,
+    handleReorder,
     handleSaveArchive,
     handleLoadArchive,
   };
