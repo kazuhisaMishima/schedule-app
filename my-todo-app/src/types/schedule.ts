@@ -53,6 +53,13 @@ export const INITIAL_FORM_DATA: ScheduleFormData = {
 };
 
 /**
+ * 繰り返し条件の型
+ */
+export type RecurrenceRule =
+  | { type: 'daily' }
+  | { type: 'weekly'; days: number[] }; // 1=月〜5=金
+
+/**
  * デフォルトタスク定義（設定パネルで編集可能）
  */
 export interface DefaultTaskDef {
@@ -60,6 +67,7 @@ export interface DefaultTaskDef {
   startTime: string;
   endTime: string;
   isRequired: boolean;
+  recurrence?: RecurrenceRule;        // undefined → 毎日（後方互換）
 }
 
 export const BUILTIN_DEFAULTS: DefaultTaskDef[] = [
